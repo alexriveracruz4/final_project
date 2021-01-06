@@ -50,8 +50,8 @@ Use the first approach explained above to download and access the ATUS data for 
 ### Importing data
 
 ```{r atus-data, warning=FALSE}
-atus.cps <- read.delim('data/raw_data/atuscps_2016.dat', sep=",")
-atus.sum <- read.delim('data/raw_data/atussum_2016.dat', sep=",")
+atus.cps <- read.delim('final_project/data/raw_data/atuscps_2016.dat', sep=",")
+atus.sum <- read.delim('final_project/data/raw_data/atussum_2016.dat', sep=",")
 atus.all <- atus.sum %>%
   left_join(atus.cps %>% filter(TULINENO==1), by = c("TUCASEID"))
 ```
@@ -60,38 +60,47 @@ atus.all <- atus.sum %>%
 
 ```{r initial-exploration}
 ### Add Code Here
+colnames(atus.all)
+mean(atus.all$t120101)
 ```
 
 
 ```{r creating-childcare-var}
 atus.all <- atus.all %>% 
-    mutate(CHILDCARE = )
+    mutate(CHILDCARE = t030101+t030102+t030103+t030104+t030105+t030106+t030108+t030109+t030110+t030111+t030112+t030199)
 ```
 
 ```{r childcare-density-plot}
-ggplot(atus.all) +
+ggplot(atus.all,aes(CHILDCARE)) +
     geom_density()
+
 ```
 
 ```{r gender-analysis}
 atus.all %>% 
-    group_by() %>% 
-    FUNCTION()
+    group_by(TESEX) %>% 
+    summarize(tiempo=mean(CHILDCARE))
 ```
 
 ```{r replacing-na}
 ## replace -1 in the variable TRDPFTPT with NA.
+table(atus.all$TRDPFTPT)
+atus.all$TRDPFTPT[atus.all$TRDPFTPT==-1]<- NA
+sum(is.na(atus.all$TRDPFTPT))
 ```
 
 ```{r exploratory-analysis}
 ## add your exploratory analysis code here
+atus.all %>% filter(TRCHILDNUM>0) %>% group_by(HEFAMINC) %>% summarise(tiempo = mean(CHILDCARE))
+atus.all %>% filter(TRCHILDNUM>0) %>% group_by(TRDPFTPT) %>% summarise(tiempo = mean(CHILDCARE))
 ```
 
 ### Regression Analysis
 
 ```{r reg-analysis}
 ## add your regression analysis code here
-reg_model <- lm()
+filt <- atus.all %>% filter(TRCHILDNUM>0)
+reg_model <- lm(CHILDCARE ~ PRMARSTA + TEAGE + TESEX + TRCHILDNUM + HEFAMINC + TRDPFTPT,data=filt)
 summary(reg_model)
 ```
 
@@ -99,48 +108,56 @@ summary(reg_model)
 
 ```{r activity-cats}
 atus.wide <- atus.all %>%
-    mutate(act01 = ,
-           act02 = ,
-           act03 = ,
-           act04 = ,
-           act05 = ,
-           act06 = ,
-           act07 = ,
-           act08 = ,
-           act09 = ,
-           act10 = ,
-           act11 = ,
-           act12 = ,
-           act13 = ,
-           act14 = ,
-           act15 = ,
-           act16 = ,
+    mutate(act01 = rowSums(select(atus.all,contains("t01"))),
+           act02 = rowSums(select(atus.all,contains("t02"))),
+           act03 = rowSums(select(atus.all,contains("t03"))),
+           act04 = rowSums(select(atus.all,contains("t04"))),
+           act05 = rowSums(select(atus.all,contains("t05"))),
+           act06 = rowSums(select(atus.all,contains("t06"))),
+           act07 = rowSums(select(atus.all,contains("t07"))),
+           act08 = rowSums(select(atus.all,contains("t08"))),
+           act09 = rowSums(select(atus.all,contains("t09"))),
+           act10 = rowSums(select(atus.all,contains("t10"))),
+           act11 = rowSums(select(atus.all,contains("t11"))),
+           act12 = rowSums(select(atus.all,contains("t12"))),
+           act13 = rowSums(select(atus.all,contains("t13"))),
+           act14 = rowSums(select(atus.all,contains("t14"))),
+           act15 = rowSums(select(atus.all,contains("t15"))),
+           act16 = rowSums(select(atus.all,contains("t16"))),
            # act17 = , there is no category 17 in the data
-           act18 = ) %>% 
+           act18 = rowSums(select(atus.all,contains("t18")))) %>% 
     select(TUCASEID, TEAGE, HEFAMINC, starts_with("act"))
+summary(atus.wide)
 ```
 
 ```{r wide-to-long}
-atus.long <- atus.wide %>% 
-  # use code to convert the wide format to long.
+# use code to convert the wide format to long.
+install.packages("tidyr")
+library(tidyr)
+atus.long <- atus.wide %>% gather(key="ACTIVITY",value="MINS",-TUCASEID,-TEAGE,-HEFAMINC)
 ```
 
 ```{r age-activity}
 atus.long %>% 
     group_by(ACTIVITY, TEAGE) %>% 
     summarise(AVGMINS = mean(MINS)) %>% 
-    ggplot() +
+    ggplot(aes(TEAGE,AVGMINS)) + geom_point() + facet_wrap(. ~ ACTIVITY)
 ```
 
 ### Exploratory Analysis of Income and Activities
 
 ```{r activity-income}
-atus.long %>% 
+a<- atus.long %>% 
   group_by(ACTIVITY, HEFAMINC) %>% 
+  summarise(time = sum(MINS))  %>% mutate(HEFAMINC=as.factor(HEFAMINC))
+b<- a %>% group_by(ACTIVITY) %>% summarise(HEFAMINC=HEFAMINC,prop=time/sum(time))
+inplot<- b %>% ggplot() + geom_bar(aes(x=ACTIVITY, y=prop, fill=HEFAMINC),stat="identity") + coord_flip() 
+inplot
   ## add the rest of the code here
 ```
 
 
 ```{r save-plot}
 ## save the plot above
+ggsave(plot = inplot, filename = "activity-income.png", path = "final_project/figures/exploratory_figures")
 ```
